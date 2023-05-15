@@ -1,0 +1,352 @@
+diff --git a/build/config/arm.gni b/build/config/arm.gni
+index 7a293e6..1c6ff69 100644
+--- a/build/config/arm.gni
++++ b/build/config/arm.gni
+@@ -22,8 +22,15 @@ if (current_cpu == "arm" || current_cpu == "arm64") {
+     # The ARM variant-specific tuning mode. This will be a string like "armv6"
+     # or "cortex-a15". An empty string means to use the default for the
+     # arm_version.
++    # Passed as `-mtune=<arm_tune>` to the compiler.
+     arm_tune = ""
+ 
++    # Passed as `-mcpu=<arm_cpu>` to the compiler.
++    arm_cpu = ""
++
++    # Passed as `-march=<arm_arch>` to the compiler.
++    arm_arch = ""
++
+     # Whether to use the neon FPU instruction set or not.
+     arm_use_neon = true
+ 
+@@ -34,25 +41,7 @@ if (current_cpu == "arm" || current_cpu == "arm64") {
+   assert(arm_float_abi == "" || arm_float_abi == "hard" ||
+          arm_float_abi == "soft" || arm_float_abi == "softfp")
+ 
+-  if (arm_version == 6) {
+-    arm_arch = "armv6"
+-    if (arm_tune != "") {
+-      arm_tune = ""
+-    }
+-    if (arm_float_abi == "") {
+-      arm_float_abi = "softfp"
+-    }
+-    arm_fpu = "vfp"
+-
+-    # Thumb is a reduced instruction set available on some ARM processors that
+-    # has increased code density.
+-    arm_use_thumb = false
+-  } else if (arm_version == 7) {
+-    arm_arch = "armv7-a"
+-    if (arm_tune == "") {
+-      arm_tune = "generic-armv7-a"
+-    }
+-
++  if (arm_version == 7) {
+     if (arm_float_abi == "") {
+       arm_float_abi = "softfp"
+     }
+diff --git a/build/config/compiler/BUILD.gn b/build/config/compiler/BUILD.gn
+index ba20010..867db58 100644
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -3,7 +3,7 @@
+ # found in the LICENSE file.
+ 
+ import("//build/config/android/config.gni")
+-if (current_cpu == "arm") {
++if (current_cpu == "arm" || current_cpu == "arm64") {
+   import("//build/config/arm.gni")
+ }
+ if (is_posix) {
+@@ -207,33 +207,86 @@ config("compiler") {
+         ]
+       }
+     } else if (current_cpu == "arm") {
+-      cflags += [
+-        "-march=$arm_arch",
+-        "-mfloat-abi=$arm_float_abi",
+-      ]
+-      if (arm_tune != "") {
+-        cflags += [ "-mtune=$arm_tune" ]
+-      }
+-      if (arm_use_thumb) {
+-        cflags += [ "-mthumb" ]
+-        if (is_android && !is_clang) {  # Clang doesn't support this option.
+-          cflags += [ "-mthumb-interwork" ]
++      if (is_clang) {
++        if (arm_float_abi == "softfp" || arm_float_abi == "soft" || arm_float_abi == "") {
++          #assert(false, "ARM softfloat is not supported by the bundled clang right now.")
++          cflags += ["--target=armv7-linux-gnueabi"]
++          ldflags += ["--target=armv7-linux-gnueabi"]
++        } else {
++          cflags += ["--target=armv7-linux-gnueabihf"]
++          ldflags += ["--target=armv7-linux-gnueabihf"]
+         }
+-      }
+-      if (!is_clang) {
+-        # Clang doesn't support these flags.
++
++        
++
++        # Any other target is not supported by the bundled clang right now.
++        # (the compiler-rt binaries inside srC/buildtools/linux-x64/clang/lib/clang/13.0.0/lib are not provided for anything else)
++        # If we specify something other than `armv7` (like `arm`, `armv7a`, `armv7-a`, `armv7l`) as the first part of the target triple,
++        # clang will attempt to load the compiler builtins (compiler-rt) from
++        #   `buildtools/linux-x64/clang/lib/clang/13.0.0/lib/linux/libclang_rt.builtins-armhf.a`
++        # instead of from
++        #   `buildtools/linux-x64/clang/lib/clang/13.0.0/lib/armv7-unknown-linux-gnueabihf/libclang_rt.builtins.a`,
++        # resulting in errors.
++        #
++        # You can use
++        #   `buildtools/linux-x64/clang/bin/clang++ --rtlib=compiler-rt --target=<target-triple> --print-libgcc-file-name`
++        # to print the compiler builtin location btw.
++        # (took me like a day to debug all this)
++        if (arm_arch != "") {
++          cflags += [ "-march=$arm_arch" ]
++        }
++        if (arm_cpu != "") {
++          cflags += [ "-mcpu=$arm_cpu" ]
++        }
++        if (arm_tune != "") {
++          cflags += [ "-mtune=$arm_tune" ]
++        }
++        if (arm_float_abi != "") {
++          cflags += [
++            "-mfloat-abi=$arm_float_abi",
++          ]
++        }
++      } else {
+         cflags += [
+-          # The tree-sra optimization (scalar replacement for
+-          # aggregates enabling subsequent optimizations) leads to
+-          # invalid code generation when using the Android NDK's
+-          # compiler (r5-r7). This can be verified using
+-          # webkit_unit_tests' WTF.Checked_int8_t test.
+-          "-fno-tree-sra",
+-
+-          # The following option is disabled to improve binary
+-          # size and performance in gcc 4.9.
+-          "-fno-caller-saves",
++          "-march=$arm_arch",
++          "-mfloat-abi=$arm_float_abi",
+         ]
++        if (arm_tune != "") {
++          cflags += [ "-mtune=$arm_tune" ]
++        }
++        if (arm_use_thumb) {
++          cflags += [ "-mthumb" ]
++          if (is_android && !is_clang) {  # Clang doesn't support this option.
++            cflags += [ "-mthumb-interwork" ]
++          }
++        }
++        if (!is_clang) {
++          # Clang doesn't support these flags.
++          cflags += [
++            # The tree-sra optimization (scalar replacement for
++            # aggregates enabling subsequent optimizations) leads to
++            # invalid code generation when using the Android NDK's
++            # compiler (r5-r7). This can be verified using
++            # webkit_unit_tests' WTF.Checked_int8_t test.
++            "-fno-tree-sra",
++
++            # The following option is disabled to improve binary
++            # size and performance in gcc 4.9.
++            "-fno-caller-saves",
++          ]
++        }
++      }
++    } else if (current_cpu == "arm64") {
++      assert(is_clang)
++
++      if (arm_arch != "") {
++        cflags += [ "-march=$arm_arch" ]
++      }
++      if (arm_cpu != "") {
++        cflags += [ "-mcpu=$arm_cpu" ]
++      }
++      if (arm_tune != "") {
++        cflags += [ "-mtune=$arm_tune" ]
+       }
+     }
+ 
+diff --git a/build/config/sysroot.gni b/build/config/sysroot.gni
+index 7987e51..dd6ebeb 100644
+--- a/build/config/sysroot.gni
++++ b/build/config/sysroot.gni
+@@ -26,9 +26,18 @@ if (current_toolchain == default_toolchain && target_sysroot != "") {
+   if (use_default_linux_sysroot && !is_fuchsia) {
+     if (current_cpu == "x64") {
+       sysroot = rebase_path("//build/linux/debian_sid_amd64-sysroot")
+-    } else {
++    } else if (current_cpu == "arm64") {
+       sysroot = rebase_path("//build/linux/debian_sid_arm64-sysroot")
++    } else if (current_cpu == "x86") {
++      sysroot = rebase_path("//build/linux/debian_sid_i386-sysroot")
++    } else if (current_cpu == "arm" && arm_float_abi == "" || arm_float_abi == "soft" || arm_float_abi == "softfp") {
++      sysroot = rebase_path("//build/linux/debian_sid_armel-sysroot")
++    } else if (current_cpu == "arm" && arm_float_abi == "hard") {
++      sysroot = rebase_path("//build/linux/debian_sid_arm-sysroot")
++    } else {
++      assert(false, "Unknown CPU: $current_cpu.")
+     }
++
+     assert(
+         exec_script("//build/dir_exists.py", [ sysroot ], "string") == "True",
+         "Missing sysroot ($sysroot). To fix, run: build/linux/sysroot_scripts/install-sysroot.py --arch=$current_cpu")
+diff --git a/build/linux/sysroot_scripts/install-sysroot.py b/build/linux/sysroot_scripts/install-sysroot.py
+index d3e7664..09b70af 100755
+--- a/build/linux/sysroot_scripts/install-sysroot.py
++++ b/build/linux/sysroot_scripts/install-sysroot.py
+@@ -1,6 +1,5 @@
+ #!/usr/bin/env python3
+-#
+-# Copyright (c) 2013 The Chromium Authors. All rights reserved.
++# Copyright 2013 The Chromium Authors
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
+@@ -19,6 +18,9 @@
+ # time chrome's build dependencies are changed but should also be updated
+ # periodically to include upstream security fixes from Debian.
+ 
++# This script looks at sysroots.json next to it to find the name of a .tar.xz
++# to download and the location to extract it to. The extracted sysroot could for
++# example be in build/linux/debian_bullseye_amd64-sysroot/.
+ 
+ 
+ import hashlib
+@@ -31,25 +33,27 @@ import shutil
+ import subprocess
+ import sys
+ try:
+-    # For Python 3.0 and later
+-    from urllib.request import urlopen
++  # For Python 3.0 and later
++  from urllib.request import urlopen
+ except ImportError:
+-    # Fall back to Python 2's urllib2
+-    from urllib.request import urlopen
++  # Fall back to Python 2's urllib2
++  from urllib2 import urlopen
+ 
+ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ 
+ URL_PREFIX = 'https://commondatastorage.googleapis.com'
+ URL_PATH = 'chrome-linux-sysroot/toolchain'
+ 
+-VALID_ARCHS = ('arm', 'arm64', 'i386', 'amd64')
++VALID_ARCHS = ('armel', 'arm', 'arm64', 'i386', 'amd64', 'mips', 'mips64el')
+ 
+ ARCH_TRANSLATIONS = {
+     'x64': 'amd64',
+     'x86': 'i386',
++    'mipsel': 'mips',
++    'mips64': 'mips64el',
+ }
+ 
+-DEFAULT_TARGET_PLATFORM = 'sid'
++DEFAULT_TARGET_PLATFORM = 'bullseye'
+ 
+ class Error(Exception):
+   pass
+@@ -74,16 +78,15 @@ def main(args):
+   parser.add_option('--all', action='store_true',
+                     help='Install all sysroot images (useful when updating the'
+                          ' images)')
+-  parser.add_option('--print-hash',
++  parser.add_option('--print-key',
+                     help='Print the hash of the sysroot for the given arch.')
+   options, _ = parser.parse_args(args)
+-  if not sys.platform.startswith('linux'):
+-    return 0
+ 
+-  if options.print_hash:
+-    arch = options.print_hash
+-    print(GetSysrootDict(DEFAULT_TARGET_PLATFORM,
+-                         ARCH_TRANSLATIONS.get(arch, arch))['Sha1Sum'])
++  if options.print_key:
++    arch = options.print_key
++    print(
++        GetSysrootDict(DEFAULT_TARGET_PLATFORM,
++                       ARCH_TRANSLATIONS.get(arch, arch))['Key'])
+     return 0
+   if options.arch:
+     InstallSysroot(DEFAULT_TARGET_PLATFORM,
+@@ -151,7 +154,7 @@ def InstallSysroot(target_platform, target_arch):
+   if sha1sum != tarball_sha1sum:
+     raise Error('Tarball sha1sum is wrong.'
+                 'Expected %s, actual: %s' % (tarball_sha1sum, sha1sum))
+-  subprocess.check_call(['tar', 'xf', tarball, '-C', sysroot])
++  subprocess.check_call(['tar', 'mxf', tarball, '-C', sysroot])
+   os.remove(tarball)
+ 
+   with open(stamp, 'w') as s:
+diff --git a/build/linux/sysroot_scripts/sysroots.json b/build/linux/sysroot_scripts/sysroots.json
+index 462530c..0200426 100644
+--- a/build/linux/sysroot_scripts/sysroots.json
++++ b/build/linux/sysroot_scripts/sysroots.json
+@@ -1,27 +1,44 @@
+ {
+-    "sid_amd64": {
+-        "Sha1Sum": "79a7783607a69b6f439add567eb6fcb48877085c",
+-        "SysrootDir": "debian_sid_amd64-sysroot",
+-        "Tarball": "debian_sid_amd64_sysroot.tar.xz"
++    "bullseye_amd64": {
++        "Key": "20230329T085712Z-1",
++        "Sha1Sum": "f5f68713249b52b35db9e08f67184cac392369ab",
++        "SysrootDir": "debian_bullseye_amd64-sysroot",
++        "Tarball": "debian_bullseye_amd64_sysroot.tar.xz"
+     },
+-    "sid_arm": {
+-        "Sha1Sum": "3fcc1d4e44127006318371002a0f421a4fde2ab4",
+-        "SysrootDir": "debian_sid_arm-sysroot",
+-        "Tarball": "debian_sid_arm_sysroot.tar.xz"
++    "bullseye_arm": {
++        "Key": "20230329T085712Z-1",
++        "Sha1Sum": "f80db01d7b3b973ca2aeeed000aa43bd0c082f15",
++        "SysrootDir": "debian_bullseye_arm-sysroot",
++        "Tarball": "debian_bullseye_arm_sysroot.tar.xz"
+     },
+-    "sid_arm64": {
+-        "Sha1Sum": "2cade9ee1ca9186b28ac768c19e1ab7c45ee0600",
+-        "SysrootDir": "debian_sid_arm64-sysroot",
+-        "Tarball": "debian_sid_arm64_sysroot.tar.xz"
++    "bullseye_arm64": {
++        "Key": "20230329T085712Z-1",
++        "Sha1Sum": "80fc74e431f37f590d0c85f16a9d8709088929e8",
++        "SysrootDir": "debian_bullseye_arm64-sysroot",
++        "Tarball": "debian_bullseye_arm64_sysroot.tar.xz"
+     },
+-    "sid_armel": {
+-        "Sha1Sum": "72aecf0a5603919b41cfb0766fe511c34933e915",
+-        "SysrootDir": "debian_sid_armel-sysroot",
+-        "Tarball": "debian_sid_armel_sysroot.tar.xz"
++    "bullseye_armel": {
++        "Key": "20230329T085712Z-1",
++        "Sha1Sum": "37801ea4e948feabd69c74390c4b80e932b63de0",
++        "SysrootDir": "debian_bullseye_armel-sysroot",
++        "Tarball": "debian_bullseye_armel_sysroot.tar.xz"
+     },
+-    "sid_i386": {
+-        "Sha1Sum": "e954fb79fcddf64bc39d721c9a5b652b6da549fa",
+-        "SysrootDir": "debian_sid_i386-sysroot",
+-        "Tarball": "debian_sid_i386_sysroot.tar.xz"
++    "bullseye_i386": {
++        "Key": "20230329T085712Z-1",
++        "Sha1Sum": "b6c18d06d79c0abb870a126a3ae5f8086e355e5f",
++        "SysrootDir": "debian_bullseye_i386-sysroot",
++        "Tarball": "debian_bullseye_i386_sysroot.tar.xz"
++    },
++    "bullseye_mips": {
++        "Key": "20230329T085712Z-1",
++        "Sha1Sum": "fed66c435eeb0bd71e9394a0fb0c4e078d90ea50",
++        "SysrootDir": "debian_bullseye_mips-sysroot",
++        "Tarball": "debian_bullseye_mips_sysroot.tar.xz"
++    },
++    "bullseye_mips64el": {
++        "Key": "20230329T085712Z-1",
++        "Sha1Sum": "37e23cd7512b3c4d0dacbc5d253f3a496c38f5fb",
++        "SysrootDir": "debian_bullseye_mips64el-sysroot",
++        "Tarball": "debian_bullseye_mips64el_sysroot.tar.xz"
+     }
+ }

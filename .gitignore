@@ -1,0 +1,8 @@
+.vscode
+artifacts
+build
+third_party
+sysroot
+sysroot.tar.*
+__pycache__
+**/__pycache__

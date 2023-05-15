@@ -1,0 +1,24 @@
+networks:
+  common:
+    driver: bridge
+
+services:
+  flutter_engine_x64:
+    platform: linux/amd64/v3
+    privileged: true
+    user: root
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    restart: no
+    tty: true
+    networks: [ common ]
+    working_dir: /src
+    volumes:
+      - ./:/src:rw
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ulimits:
+      nofile:
+        soft: 655350
+        hard: 655350

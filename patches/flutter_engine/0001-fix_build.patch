@@ -1,0 +1,125 @@
+diff --git a/build/dart/rules.gni b/build/dart/rules.gni
+index 00b801b2c2..ded17e9fe1 100644
+--- a/build/dart/rules.gni
++++ b/build/dart/rules.gni
+@@ -106,7 +106,7 @@ template("flutter_snapshot") {
+   }
+ 
+   compiled_action(snapshot_target) {
+-    if (target_cpu == "x86" && host_os == "linux") {
++    if ((target_cpu == "x86" || target_cpu == "arm") && host_os == "linux") {
+       # By default Dart will create a 32-bit gen_snapshot host binary if the target
+       # platform is 32-bit.  Override this to create a 64-bit gen_snapshot for x86
+       # targets because some host platforms may not support 32-bit binaries.
+diff --git a/common/config.gni b/common/config.gni
+index afb8f0b2b2..3525443411 100644
+--- a/common/config.gni
++++ b/common/config.gni
+@@ -132,4 +132,4 @@ if (flutter_prebuilt_dart_sdk) {
+ # see https://github.com/flutter/flutter/issues/74322
+ build_engine_artifacts =
+     current_toolchain == host_toolchain ||
+-    (is_linux && !is_chromeos && current_cpu != "arm") || is_mac || is_win
++    (is_linux && !is_chromeos) || is_mac || is_win
+diff --git a/lib/snapshot/BUILD.gn b/lib/snapshot/BUILD.gn
+index d8176bdf51..e500da9f85 100644
+--- a/lib/snapshot/BUILD.gn
++++ b/lib/snapshot/BUILD.gn
+@@ -59,7 +59,7 @@ group("generate_snapshot_bins") {
+ # See: `bin_to_linkable` rules below that build these outputs into linkable form
+ # See: https://github.com/flutter/flutter/wiki/Flutter-engine-operation-in-AOT-Mode
+ compiled_action("generate_snapshot_bin") {
+-  if (target_cpu == "x86" && host_os == "linux") {
++  if ((target_cpu == "x86" || target_cpu == "arm") && host_os == "linux") {
+     # By default Dart will create a 32-bit gen_snapshot host binary if the target
+     # platform is 32-bit.  Override this to create a 64-bit gen_snapshot for x86
+     # targets because some host platforms may not support 32-bit binaries.
+diff --git a/tools/gn b/tools/gn
+index 27f65988f5..2625382d62 100755
+--- a/tools/gn
++++ b/tools/gn
+@@ -102,6 +102,10 @@ def is_host_build(args):
+   # target_os='linux' and linux-cpu='arm64'
+   if args.target_os == 'linux' and args.linux_cpu == 'arm64':
+     return True
++  # For linux arm builds, we cross compile from x64 hosts, so the
++  # target_os='linux' and linux-cpu='arm64'
++  if args.target_os == 'linux' and args.linux_cpu == 'arm':
++    return True
+   # The Mac and host targets are redundant. Again, necessary to disambiguate
+   # during cross-compilation.
+   if args.target_os == 'mac':
+@@ -167,8 +171,10 @@ def get_host_cpu():
+   if is_rosetta():
+     return 'arm64'
+   machine = platform.machine()
+-  if machine in ['aarch64', 'arm64', 'ARM64']:
++  if machine in ['aarch64', 'arm64', 'ARM64', 'armv8']:
+     return 'arm64'
++  if machine in ['arm', 'armv7', 'armv7l']:
++    return 'arm'
+   if machine in ['x86_64', 'AMD64', 'x64']:
+     return 'x64'
+   if machine in ['i686', 'i386', 'x86']:
+@@ -342,6 +348,11 @@ def to_gn_args(args):
+     gn_args['host_cpu'] = 'x86'
+     gn_args['current_cpu'] = 'x86'
+ 
++  # We can not build arm 32 bits using x86_64 so we use x86_32
++  if (args.target_os == 'linux' and gn_args['target_cpu'] == 'arm' and get_host_cpu() == 'x64'):
++    gn_args['host_cpu'] = 'x86'
++    #gn_args['current_cpu'] = 'x86'
++
+   if is_host_build(args) and gn_args['host_os'] == 'mac':
+     # macOS host builds (whether x64 or arm64) must currently be built under
+     # Rosetta on Apple Silicon Macs.
+@@ -466,6 +477,15 @@ def to_gn_args(args):
+   if args.arm_float_abi:
+     gn_args['arm_float_abi'] = args.arm_float_abi
+ 
++  if args.cpu:
++    gn_args['arm_cpu'] = args.cpu
++
++  if args.cpu_arch:
++    gn_args['arm_arch'] = args.cpu_arch
++
++  if args.cpu_tune:
++    gn_args['arm_tune'] = args.cpu_tune
++
+   # If we have a prebuilt for the Dart SDK for the target architecture, then
+   # use it instead of building a new one.
+   if args.prebuilt_dart_sdk:
+@@ -573,6 +593,8 @@ def to_gn_args(args):
+     if get_host_os() == 'win':
+       gn_args['angle_force_context_check_every_call'] = True
+ 
++    # Disable Vulkan Support
++    gn_args['impeller_enable_vulkan'] = False
+     # Requires RTTI. We may want to build this in debug modes, punting on that
+     # for now.
+     gn_args['angle_enable_vulkan_validation_layers'] = False
+@@ -749,6 +771,24 @@ def parse_args(args):
+   parser.add_argument(
+       '--arm-float-abi', type=str, choices=['hard', 'soft', 'softfp']
+   )
++  parser.add_argument(
++      '--cpu-tune',
++      default=None,
++      type=str,
++      help='Passed as `-mtune=<arm_tune>` to the compiler.'
++  )
++  parser.add_argument(
++      '--cpu-arch',
++      default=None,
++      type=str,
++      help='Passed as `-march=<arm_arch>` to the compiler.'
++  )
++  parser.add_argument(
++      '--cpu',
++      default=None,
++      type=str,
++      help='Passed as `-mcpu=<arm_cpu>` to the compiler.'
++  )
+ 
+   parser.add_argument('--goma', default=True, action='store_true')
+   parser.add_argument('--no-goma', dest='goma', action='store_false')
