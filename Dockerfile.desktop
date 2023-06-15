@@ -1,0 +1,106 @@
+# x11docker/kde-plasma
+# 
+# Run KDE plasma desktop in docker. 
+# Use x11docker to run image: 
+#   https://github.com/mviereck/x11docker 
+#
+# Examples: 
+#  - Run desktop:
+#      x11docker --desktop --gpu --init=systemd -- x11docker/kde-plasma
+#  - Run single application:
+#      x11docker x11docker/kde-plasma konsole
+#  - Run Plasma as Wayland compositor:
+#      x11docker --gpu --kwin docker.io/library/flutter_engine-desktop_armv7 plasmashell
+#      x11docker --gpu --init=systemd -- --cap-add=SYS_RESOURCE -- docker.io/library/flutter_engine-desktop_armv7 startplasmacompositor
+#      x11docker --wayland --dbus docker.io/library/flutter_engine-desktop_armv7 konsole 
+#      x11docker --gpu -I --dbus --init=systemd --share=/home/tfsthiagobr98/Documentos/Projects/Flutter_Kindle/flutter_engine -- --cap-add=SYS_RESOURCE -- docker.io/library/flutter_engine-desktop_armv7 startplasmacompositor
+# Options:
+#   Persistent home folder stored on host with   --home
+#   Shared host file or folder with              --share PATH
+#   Hardware acceleration with option            --gpu
+#   Clipboard sharing with option                --clipboard
+#   ALSA sound support with option               --alsa
+#   Pulseaudio sound support with option         --pulseaudio
+#   Language locale setting with option          --lang [=$LANG]
+#   Printer support over CUPS with option        --printer
+#   Webcam support with option                   --webcam
+#
+# See x11docker --help for further options.
+
+FROM debian:buster
+
+ENV LANG=en_US.UTF-8
+RUN apt-get update && \
+    env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      locales && \
+    echo "$LANG UTF-8" >> /etc/locale.gen && \
+    locale-gen && \
+    env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      kwin-x11 \
+      plasma-desktop \
+      plasma-workspace && \
+    apt-get remove -y bluedevil && \
+    apt-get autoremove -y
+
+# Dirty fix to avoid kdeinit error ind startkde. Did not find a proper solution.
+RUN sed -i 's/.*kdeinit/###&/' /usr/bin/startkde
+
+# Wayland: startplasmacompositor
+RUN env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      kwin-wayland-backend-x11 kwin-wayland-backend-wayland && \
+    env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      plasma-workspace-wayland && \
+    sed -i 's/--libinput//' /usr/bin/startplasmacompositor
+    
+RUN env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      konsole \
+      kwrite \
+      libcups2 \
+      libpulse0 \
+      procps \
+      psmisc \
+      sudo \
+      synaptic \
+      systemsettings
+
+CMD startkde
+
+RUN env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    unzip \
+    zip \
+    dbus \
+    at-spi2-core \
+    xdg-desktop-portal \
+    xdg-desktop-portal-kde \
+    libglib2.0-dev \
+    libglib2.0-dev-bin \
+    sudo \
+    git \
+    make \
+    lld \
+    llvm \
+    libc++-dev \
+    clang \
+    python3 \
+    cmake \
+    binutils \
+    ninja-build \
+    pkg-config \
+    libgtk-3-dev \
+    liblzma-dev \
+    curl \
+    build-essential \
+    python3-virtualenv \
+    python3-httplib2 \
+    python3-six \
+    pcregrep
+
+RUN set -eux; \
+	addgroup -gid 1000 builder; \
+	useradd -u 1000 -s /bin/bash -g builder builder; \
+	mkdir --parent /src; \
+    mkdir --parent /home/builder; \
+	chown builder:builder -R /src; \
+    chown builder:builder -R /home/builder;
+
+USER builder

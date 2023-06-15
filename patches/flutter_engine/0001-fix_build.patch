@@ -1,5 +1,31 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index d00ac7c..65b710d 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -90,7 +90,7 @@ group("flutter") {
+         "//flutter/tools/path_ops",
+       ]
+ 
+-      if (host_os == "linux") {
++      if (host_os == "linux" && (target_cpu == "x64" || target_cpu == "arm64")) {
+         public_deps += [
+           # Built alongside gen_snapshot for 64 bit targets
+           "//third_party/dart/runtime/bin:analyze_snapshot",
+diff --git a/DEPS b/DEPS
+index 2d6df38..3128dd2 100644
+--- a/DEPS
++++ b/DEPS
+@@ -455,7 +455,7 @@ deps = {
+    Var('dart_git') + '/test_reflective_loader.git@a85a930ad3736f93b96f6cc104d3576c1ae19e0e',
+ 
+   'src/third_party/dart/third_party/pkg/tools':
+-   Var('dart_git') + '/tools.git@0304fbbb42989abd9ab6bbdfad26d830c96a7574',
++   Var('dart_git') + '/tools.git@8d6e8b82e3eef8b2f5e3ec9bdd3dd1a2ad3e13f5',
+ 
+   'src/third_party/dart/third_party/pkg/typed_data':
+    Var('dart_git') + '/typed_data.git@d85363d2efb333afce07ec409a529ec32986e1a2',
 diff --git a/build/dart/rules.gni b/build/dart/rules.gni
-index 00b801b2c2..ded17e9fe1 100644
+index 00b801b..7168490 100644
 --- a/build/dart/rules.gni
 +++ b/build/dart/rules.gni
 @@ -106,7 +106,7 @@ template("flutter_snapshot") {
@@ -7,38 +33,319 @@ index 00b801b2c2..ded17e9fe1 100644
  
    compiled_action(snapshot_target) {
 -    if (target_cpu == "x86" && host_os == "linux") {
-+    if ((target_cpu == "x86" || target_cpu == "arm") && host_os == "linux") {
++    if ((target_cpu == "x86" || target_cpu == "arm" || target_cpu == "riscv32") && host_os == "linux") {
        # By default Dart will create a 32-bit gen_snapshot host binary if the target
        # platform is 32-bit.  Override this to create a 64-bit gen_snapshot for x86
        # targets because some host platforms may not support 32-bit binaries.
 diff --git a/common/config.gni b/common/config.gni
-index afb8f0b2b2..3525443411 100644
+index 142701b..9b9de8f 100644
 --- a/common/config.gni
 +++ b/common/config.gni
-@@ -132,4 +132,4 @@ if (flutter_prebuilt_dart_sdk) {
- # see https://github.com/flutter/flutter/issues/74322
+@@ -127,4 +127,4 @@ if (flutter_prebuilt_dart_sdk) {
  build_engine_artifacts =
-     current_toolchain == host_toolchain ||
--    (is_linux && !is_chromeos && current_cpu != "arm") || is_mac || is_win
-+    (is_linux && !is_chromeos) || is_mac || is_win
+     flutter_build_engine_artifacts &&
+     (current_toolchain == host_toolchain ||
+-     (is_linux && !is_chromeos && current_cpu != "arm") || is_mac || is_win)
++     (is_linux && !is_chromeos) || is_mac || is_win)
+diff --git a/display_list/BUILD.gn b/display_list/BUILD.gn
+index 25b3b23..1a034b6 100644
+--- a/display_list/BUILD.gn
++++ b/display_list/BUILD.gn
+@@ -181,59 +181,59 @@ if (enable_unittests) {
+       "//flutter/testing:testing_lib",
+     ]
+   }
+-}
+-
+-fixtures_location("display_list_benchmarks_fixtures") {
+-  assets_dir = "$target_gen_dir/"
+-}
+-
+-source_set("display_list_benchmarks_source") {
+-  testonly = true
+ 
+-  sources = [
+-    "benchmarking/dl_benchmarks.cc",
+-    "benchmarking/dl_benchmarks.h",
+-  ]
+-
+-  deps = [
+-    ":display_list",
+-    ":display_list_benchmarks_fixtures",
+-    "//flutter/benchmarking",
+-    "//flutter/common/graphics",
+-    "//flutter/display_list/testing:display_list_surface_provider",
+-    "//flutter/fml",
+-    "//flutter/testing:skia",
+-    "//flutter/testing:testing_lib",
+-    "//third_party/dart/runtime:libdart_jit",  # for tracing
+-    "//third_party/skia",
+-  ]
+-}
+-
+-executable("display_list_benchmarks") {
+-  testonly = true
+-
+-  deps = [ ":display_list_benchmarks_source" ]
+-}
++  fixtures_location("display_list_benchmarks_fixtures") {
++    assets_dir = "$target_gen_dir/"
++  }
+ 
+-if (is_ios) {
+-  shared_library("ios_display_list_benchmarks") {
++  source_set("display_list_benchmarks_source") {
+     testonly = true
+-    visibility = [ ":*" ]
+ 
+-    configs -= [
+-      "//build/config/gcc:symbol_visibility_hidden",
+-      "//build/config:symbol_visibility_hidden",
+-    ]
+-    configs += [ "//flutter/benchmarking:benchmark_library_config" ]
+-    cflags = [
+-      "-fobjc-arc",
+-      "-mios-simulator-version-min=$ios_testing_deployment_target",
++    sources = [
++      "benchmarking/dl_benchmarks.cc",
++      "benchmarking/dl_benchmarks.h",
+     ]
+-    ldflags =
+-        [ "-Wl,-install_name,@rpath/libios_display_list_benchmarks.dylib" ]
++
+     deps = [
+-      ":display_list_benchmarks_source",
+-      "//flutter/benchmarking:benchmarking_library",
++      ":display_list",
++      ":display_list_benchmarks_fixtures",
++      "//flutter/benchmarking",
++      "//flutter/common/graphics",
++      "//flutter/display_list/testing:display_list_surface_provider",
++      "//flutter/fml",
++      "//flutter/testing:skia",
++      "//flutter/testing:testing_lib",
++      "//third_party/dart/runtime:libdart_jit",  # for tracing
++      "//third_party/skia",
+     ]
+   }
++
++  executable("display_list_benchmarks") {
++    testonly = true
++
++    deps = [ ":display_list_benchmarks_source" ]
++  }
++
++  if (is_ios) {
++    shared_library("ios_display_list_benchmarks") {
++      testonly = true
++      visibility = [ ":*" ]
++
++      configs -= [
++        "//build/config/gcc:symbol_visibility_hidden",
++        "//build/config:symbol_visibility_hidden",
++      ]
++      configs += [ "//flutter/benchmarking:benchmark_library_config" ]
++      cflags = [
++        "-fobjc-arc",
++        "-mios-simulator-version-min=$ios_testing_deployment_target",
++      ]
++      ldflags =
++          [ "-Wl,-install_name,@rpath/libios_display_list_benchmarks.dylib" ]
++      deps = [
++        ":display_list_benchmarks_source",
++        "//flutter/benchmarking:benchmarking_library",
++      ]
++    }
++  }
+ }
+diff --git a/display_list/testing/BUILD.gn b/display_list/testing/BUILD.gn
+index e1965e8..ca768ab 100644
+--- a/display_list/testing/BUILD.gn
++++ b/display_list/testing/BUILD.gn
+@@ -4,6 +4,7 @@
+ # We only do software benchmarks on non-mobile platforms
+ 
+ import("//flutter/impeller/tools/impeller.gni")
++import("//flutter/testing/testing.gni")
+ 
+ source_set("display_list_testing") {
+   testonly = true
+@@ -59,46 +60,48 @@ config("surface_provider_config") {
+   }
+ }
+ 
+-source_set("display_list_surface_provider") {
+-  testonly = true
+-
+-  sources = [ "dl_test_surface_provider.cc" ]
++if (enable_unittests) {
++  source_set("display_list_surface_provider") {
++    testonly = true
+ 
+-  deps = [
+-    "//flutter/common/graphics",
+-    "//flutter/testing:testing_lib",
+-  ]
++    sources = [ "dl_test_surface_provider.cc" ]
+ 
+-  public_configs = [ ":surface_provider_config" ]
+-
+-  if (is_android) {
+-    libs = [
+-      "android",
+-      "EGL",
+-      "GLESv2",
++    deps = [
++      "//flutter/common/graphics",
++      "//flutter/testing:testing_lib",
+     ]
+-  }
+ 
+-  if (surface_provider_include_software) {
+-    sources += [
+-      "dl_test_surface_software.cc",
+-      "dl_test_surface_software.h",
+-    ]
+-  }
+-
+-  if (surface_provider_include_gl) {
+-    sources += [
+-      "dl_test_surface_gl.cc",
+-      "dl_test_surface_gl.h",
+-    ]
+-    deps += [ "//flutter/testing:opengl" ]
+-  }
+-
+-  if (surface_provider_include_metal) {
+-    sources += [
+-      "dl_test_surface_metal.cc",
+-      "dl_test_surface_metal.h",
+-    ]
+-    deps += [ "//flutter/testing:metal" ]
++    public_configs = [ ":surface_provider_config" ]
++
++    if (is_android) {
++      libs = [
++        "android",
++        "EGL",
++        "GLESv2",
++      ]
++    }
++
++    if (surface_provider_include_software) {
++      sources += [
++        "dl_test_surface_software.cc",
++        "dl_test_surface_software.h",
++      ]
++    }
++
++    if (surface_provider_include_gl) {
++      sources += [
++        "dl_test_surface_gl.cc",
++        "dl_test_surface_gl.h",
++      ]
++      deps += [ "//flutter/testing:opengl" ]
++    }
++
++    if (surface_provider_include_metal) {
++      sources += [
++        "dl_test_surface_metal.cc",
++        "dl_test_surface_metal.h",
++      ]
++      deps += [ "//flutter/testing:metal" ]
++    }
+   }
+ }
+diff --git a/impeller/tools/impeller.gni b/impeller/tools/impeller.gni
+index 94289cf..1dbc97a 100644
+--- a/impeller/tools/impeller.gni
++++ b/impeller/tools/impeller.gni
+@@ -78,7 +78,10 @@ template("impeller_component") {
+       if (!defined(invoker.cflags)) {
+         cflags = []
+       }
+-      cflags += [ "-Wthread-safety-analysis" ]
++
++      if (is_clang) {
++        cflags += [ "-Wthread-safety-analysis" ]
++      }
+ 
+       if (!defined(invoker.cflags_objc)) {
+         cflags_objc = []
 diff --git a/lib/snapshot/BUILD.gn b/lib/snapshot/BUILD.gn
-index d8176bdf51..e500da9f85 100644
+index eacbee2..fd3315b 100644
 --- a/lib/snapshot/BUILD.gn
 +++ b/lib/snapshot/BUILD.gn
-@@ -59,7 +59,7 @@ group("generate_snapshot_bins") {
+@@ -60,7 +60,7 @@ group("generate_snapshot_bins") {
  # See: `bin_to_linkable` rules below that build these outputs into linkable form
  # See: https://github.com/flutter/flutter/wiki/Flutter-engine-operation-in-AOT-Mode
  compiled_action("generate_snapshot_bin") {
 -  if (target_cpu == "x86" && host_os == "linux") {
-+  if ((target_cpu == "x86" || target_cpu == "arm") && host_os == "linux") {
++  if ((target_cpu == "x86" || target_cpu == "arm" || target_cpu == "riscv32") && host_os == "linux") {
      # By default Dart will create a 32-bit gen_snapshot host binary if the target
      # platform is 32-bit.  Override this to create a 64-bit gen_snapshot for x86
      # targets because some host platforms may not support 32-bit binaries.
+diff --git a/shell/platform/linux/BUILD.gn b/shell/platform/linux/BUILD.gn
+index 5cb9f28..c7dae94 100644
+--- a/shell/platform/linux/BUILD.gn
++++ b/shell/platform/linux/BUILD.gn
+@@ -306,3 +306,41 @@ zip_bundle("flutter_gtk") {
+   ]
+   files = tmp_files
+ }
++
++if (build_glfw_shell) {
++  zip_bundle("flutter_glfw") {
++    prefix = "$full_target_platform_name-$flutter_runtime_mode/"
++    output = "${prefix}${full_target_platform_name}-flutter-glfw.zip"
++    deps = [
++      ":flutter_linux_glfw",
++      ":publish_headers_linux",
++      "//flutter/shell/platform/glfw:publish_headers_glfw",
++      "//third_party/dart/runtime/bin:gen_snapshot",
++    ]
++    tmp_files = []
++    sources = get_target_outputs(":publish_headers_linux")
++    foreach(source, sources) {
++      tmp_files += [
++        {
++          source = source
++          destination = rebase_path(source, "$root_build_dir")
++        },
++      ]
++    }
++    tmp_files += [
++      {
++        source = "$root_build_dir/libflutter_${host_os}_glfw.so"
++        destination = "libflutter_${host_os}_glfw.so"
++      },
++      {
++        source = "$root_build_dir/flutter_glfw.h"
++        destination = "flutter_linux/flutter_glfw.h"
++      },
++      {
++        source = "$root_build_dir/gen_snapshot"
++        destination = "gen_snapshot"
++      },
++    ]
++    files = tmp_files
++  }
++}
+\ No newline at end of file
 diff --git a/tools/gn b/tools/gn
-index 27f65988f5..2625382d62 100755
+index 366ec6b..8215465 100755
 --- a/tools/gn
 +++ b/tools/gn
-@@ -102,6 +102,10 @@ def is_host_build(args):
+@@ -80,6 +80,8 @@ def to_command_line(gn_args):
+   def merge(key, value):
+     if isinstance(value, bool):
+       return '%s=%s' % (key, 'true' if value else 'false')
++    if isinstance(value, int):
++      return '%s=%s' % (key, value)
+     return '%s="%s"' % (key, value)
+ 
+   return [merge(x, y) for x, y in gn_args.items()]
+@@ -93,6 +95,14 @@ def is_host_build(args):
    # target_os='linux' and linux-cpu='arm64'
    if args.target_os == 'linux' and args.linux_cpu == 'arm64':
      return True
@@ -46,34 +353,59 @@ index 27f65988f5..2625382d62 100755
 +  # target_os='linux' and linux-cpu='arm64'
 +  if args.target_os == 'linux' and args.linux_cpu == 'arm':
 +    return True
++  # For linux risc builds, we cross compile from x64 hosts, so the
++  # target_os='linux' and linux-cpu='arm64'
++  if args.target_os == 'linux' and (args.linux_cpu == 'riscv32' or args.linux_cpu == 'riscv64'):
++    return True
    # The Mac and host targets are redundant. Again, necessary to disambiguate
    # during cross-compilation.
    if args.target_os == 'mac':
-@@ -167,8 +171,10 @@ def get_host_cpu():
+@@ -158,12 +168,18 @@ def get_host_cpu():
    if is_rosetta():
      return 'arm64'
    machine = platform.machine()
 -  if machine in ['aarch64', 'arm64', 'ARM64']:
 +  if machine in ['aarch64', 'arm64', 'ARM64', 'armv8']:
      return 'arm64'
-+  if machine in ['arm', 'armv7', 'armv7l']:
++  if machine in ['arm', 'armv7', 'armv7l', 'armel', 'armv6', 'armv6j', 'armv5tj']:
 +    return 'arm'
    if machine in ['x86_64', 'AMD64', 'x64']:
      return 'x64'
    if machine in ['i686', 'i386', 'x86']:
-@@ -342,6 +348,11 @@ def to_gn_args(args):
-     gn_args['host_cpu'] = 'x86'
-     gn_args['current_cpu'] = 'x86'
+     return 'x86'
++  if machine in ['riscv64']:
++    return 'riscv64'
++  if machine in ['riscv32']:
++    return 'riscv32'
+   raise Exception('Unknown CPU architecture: %s' % machine)
+ 
+ 
+@@ -349,6 +365,10 @@ def to_gn_args(args):
+   if get_host_os() == 'mac' and not args.force_mac_arm64:
+     gn_args['host_cpu'] = 'x64'
  
 +  # We can not build arm 32 bits using x86_64 so we use x86_32
 +  if (args.target_os == 'linux' and gn_args['target_cpu'] == 'arm' and get_host_cpu() == 'x64'):
 +    gn_args['host_cpu'] = 'x86'
-+    #gn_args['current_cpu'] = 'x86'
 +
    if is_host_build(args) and gn_args['host_os'] == 'mac':
-     # macOS host builds (whether x64 or arm64) must currently be built under
-     # Rosetta on Apple Silicon Macs.
-@@ -466,6 +477,15 @@ def to_gn_args(args):
+     # macOS unit tests include Vulkan headers which reference Metal types
+     # introduced in macOS 10.14.
+@@ -417,8 +437,13 @@ def to_gn_args(args):
+   if args.target_toolchain:
+     gn_args['custom_toolchain'] = args.target_toolchain
+ 
++  if args.gcc_toolchain_path:
++    gn_args['use_gcc_path'] = True
++    gn_args['gcc_toolchain_path'] = args.gcc_toolchain_path
++
+   if args.target_triple:
+     gn_args['custom_target_triple'] = args.target_triple
++    gn_args['toolchain_prefix'] = args.target_triple + '-'
+ 
+   # Enable Metal on iOS builds.
+   if args.target_os == 'ios':
+@@ -464,6 +489,21 @@ def to_gn_args(args):
    if args.arm_float_abi:
      gn_args['arm_float_abi'] = args.arm_float_abi
  
@@ -86,21 +418,18 @@ index 27f65988f5..2625382d62 100755
 +  if args.cpu_tune:
 +    gn_args['arm_tune'] = args.cpu_tune
 +
++  if args.arm_version:
++    gn_args['arm_version'] = args.arm_version
++
++  if (args.arm_version == 6):
++    gn_args['sysroot_arch'] = 'armel'
++
    # If we have a prebuilt for the Dart SDK for the target architecture, then
    # use it instead of building a new one.
    if args.prebuilt_dart_sdk:
-@@ -573,6 +593,8 @@ def to_gn_args(args):
-     if get_host_os() == 'win':
-       gn_args['angle_force_context_check_every_call'] = True
- 
-+    # Disable Vulkan Support
-+    gn_args['impeller_enable_vulkan'] = False
-     # Requires RTTI. We may want to build this in debug modes, punting on that
-     # for now.
-     gn_args['angle_enable_vulkan_validation_layers'] = False
-@@ -749,6 +771,24 @@ def parse_args(args):
+@@ -756,6 +796,30 @@ def parse_args(args):
    parser.add_argument(
-       '--arm-float-abi', type=str, choices=['hard', 'soft', 'softfp']
+       '--windows', dest='target_os', action='store_const', const='win'
    )
 +  parser.add_argument(
 +      '--cpu-tune',
@@ -120,6 +449,21 @@ index 27f65988f5..2625382d62 100755
 +      type=str,
 +      help='Passed as `-mcpu=<arm_cpu>` to the compiler.'
 +  )
++  parser.add_argument(
++      '--arm-version',
++      default=None,
++      type=int, choices=[5, 6, 7, 8],
++      help='Define the arm version (5;6=armel, 7=armhf, 8=arm64) Default is 7 if arm or 8 if arm64'
++  )
  
-   parser.add_argument('--goma', default=True, action='store_true')
-   parser.add_argument('--no-goma', dest='goma', action='store_false')
+   parser.add_argument(
+       '--linux-cpu', type=str, choices=['x64', 'x86', 'arm64', 'arm']
+@@ -832,6 +896,8 @@ def parse_args(args):
+   parser.add_argument('--target-sysroot', type=str)
+   parser.add_argument('--target-toolchain', type=str)
+   parser.add_argument('--target-triple', type=str)
++  parser.add_argument('--gcc-toolchain-path', type=str)
++  
+   parser.add_argument(
+       '--operator-new-alignment',
+       dest='operator_new_alignment',

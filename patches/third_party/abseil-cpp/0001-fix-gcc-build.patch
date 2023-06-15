@@ -1,0 +1,29 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 65d3e56..98afad1 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -120,14 +120,16 @@ group("default") {
+ 
+ config("absl_include_config") {
+   include_dirs = [ "." ]
+-  cflags_cc = [
+-    "-Wno-unknown-warning-option",
+-    "-Wno-deprecated-builtins",
+-  ]
+-  cflags_objcc = [
+-    "-Wno-unknown-warning-option",
+-    "-Wno-deprecated-builtins",
+-  ]
++  if (is_clang) {
++    cflags_cc = [
++      "-Wno-unknown-warning-option",
++      "-Wno-deprecated-builtins",
++    ]
++    cflags_objcc = [
++      "-Wno-unknown-warning-option",
++      "-Wno-deprecated-builtins",
++    ]
++  }
+ }
+ 
+ config("absl_define_config") {

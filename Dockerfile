@@ -12,22 +12,41 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update; \
     gcc \
     lld-15 \
     libunwind-15-dev \
-    clang-15 clang-tools-15 libclang-common-15-dev libclang-15-dev libclang1-15 clang-format-15 clangd-15 clang-tidy-15 \
+    libxml2-dev \
+    clang clang-15 clang-tools-15 libclang-common-15-dev libclang-15-dev libclang1-15 clang-format-15 clangd-15 clang-tidy-15 \
     libllvm-15-ocaml-dev libllvm15 llvm-15 llvm-15-dev llvm-15-runtime \
     libc++-15-dev libc++abi-15-dev \
     linux-libc-dev-armel-cross \
     linux-libc-dev-armhf-cross \
     linux-libc-dev-i386-cross \
+    libgcc-12-dev-i386-cross \
+    libc6-dev-i386 \
+    libx32stdc++-11-dev-i386-cross \
+    libstdc++-12-dev-i386-cross \
+    libstdc++-12-dev-armhf-cross \
+    libstdc++6-i386-cross \
+    libx32stdc++6-i386-cross \
+    lib32stdc++6 \
     libc6-dev-armhf-cross \
     libc6-dev-armel-cross \
     libc6-dev-i386-amd64-cross \
     libgcc-12-dev-armhf-cross \
     libgcc-12-dev-armel-cross \
+    lib32gcc-12-dev \
+    libgcc-12-dev \
+    zlib1g-dev \
+    libcurl4-openssl-dev \
+    libx32gcc-12-dev \
+    gcc \
+    g++ \
     gcc-arm-linux-gnueabihf \
+    g++-arm-linux-gnueabihf \
     gcc-arm-linux-gnueabi \
+    g++-arm-linux-gnueabi \
     gcc-i686-linux-gnu \
-    gcc-x86-64-linux-gnu \
+    g++-i686-linux-gnu \
     gcc-x86-64-linux-gnux32 \
+    g++-x86-64-linux-gnux32 \
     python3 \
     cmake \
     binutils \
@@ -36,17 +55,20 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update; \
     libgtk-3-dev \
     liblzma-dev \
     curl \
+    libzstd-dev \
     build-essential \
     python3-virtualenv \
     python3-httplib2 \
     python3-six \
     pcregrep \
     libfuse-dev \
+    libstdc++-12-dev \
     binutils \
     coreutils \
     desktop-file-utils \
     fakeroot \
     fuse \
+    zstd \
     libgdk-pixbuf2.0-dev \
     patchelf \
     python3-pip \
@@ -67,6 +89,8 @@ RUN dpkg --add-architecture i386; \
     \
     libstdc++6:i386 \
     libgcc1:i386 \
+    libc++-dev:i386 \
+ 	libstdc++-12-dev:i386 \
     && \
     rm -rf /var/lib/apt/lists/*
 
@@ -77,6 +101,7 @@ RUN dpkg --add-architecture armel; \
     \
     libstdc++6:armel \
     libgcc1:armel \
+    libstdc++-12-dev:armel \
     && \
     rm -rf /var/lib/apt/lists/*
 
@@ -87,6 +112,7 @@ RUN dpkg --add-architecture armhf; \
     \
     libstdc++6:armhf \
     libgcc1:armhf \
+    libstdc++-12-dev:armhf \
     && \
     rm -rf /var/lib/apt/lists/*
 
@@ -120,6 +146,13 @@ RUN set -eux; \
     mkdir --parent /home/builder; \
 	chown builder:builder -R /src; \
     chown builder:builder -R /home/builder;
+
+RUN ln -s /usr/lib/gcc/i686-linux-gnu/12/libstdc++.so /usr/lib/gcc/x86_64-linux-gnu/12/32/libstdc++.so
+
+# Install GN
+# RUN mkdir /opt/llvm; \
+#     cd /opt/llvm; \
+#     git clone https://github.com/llvm/llvm-project.git --depth 3 -b release/16.x src
 
 USER builder
 ENV GDK_BACKEND=x11

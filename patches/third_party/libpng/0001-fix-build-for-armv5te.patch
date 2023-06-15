@@ -1,0 +1,36 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 3448491..c9bdedf 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -31,16 +31,21 @@ source_set("libpng") {
+   ]
+ 
+   if (current_cpu == "arm" || current_cpu == "arm64") {
+-    sources += [
+-      "arm/arm_init.c",
+-      "arm/filter_neon.S",
+-      "arm/filter_neon_intrinsics.c",
+-      "arm/palette_neon_intrinsics.c",
+-    ]
+-
+-    defines += [ "PNG_ARM_NEON_OPT=2" ]
+-
+-    cflags_c += [ "-Wno-sign-compare" ]
++    if (current_cpu == "arm" || current_cpu == "arm64") {
++      import("//build/config/arm.gni")
++    }
++    if (arm_use_neon) {
++      sources += [
++        "arm/arm_init.c",
++        "arm/filter_neon.S",
++        "arm/filter_neon_intrinsics.c",
++        "arm/palette_neon_intrinsics.c",
++      ]
++
++      defines += [ "PNG_ARM_NEON_OPT=2" ]
++
++      cflags_c += [ "-Wno-sign-compare" ]
++    }
+   }
+ 
+   if (is_win) {

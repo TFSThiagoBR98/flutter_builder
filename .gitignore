@@ -1,8 +1,7 @@
 .vscode
 artifacts
 build
-third_party
-sysroot
-sysroot.tar.*
+llvm
+prepfiles
 __pycache__
 **/__pycache__

@@ -1,0 +1,13 @@
+diff --git a/modules/skcms/BUILD.gn b/modules/skcms/BUILD.gn
+index 572cb610ef..3782a3cb0e 100644
+--- a/modules/skcms/BUILD.gn
++++ b/modules/skcms/BUILD.gn
+@@ -7,7 +7,7 @@ import("skcms.gni")
+ 
+ static_library("skcms") {
+   cflags = []
+-  if (!is_win || is_clang) {
++  if (!is_win && is_clang) {
+     cflags += [ "-std=c11" ]
+   }
+ 
